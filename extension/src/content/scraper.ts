@@ -184,16 +184,25 @@ export function extractVisibleTweets(): ScrapedTweet[] {
  */
 async function smoothScroll(): Promise<void> {
   return new Promise((resolve) => {
-    const currentScroll = window.scrollY;
-    const targetScroll = currentScroll + window.innerHeight * 0.8;
-    
-    window.scrollTo({
-      top: targetScroll,
-      behavior: 'smooth',
-    });
-    
-    // Wait for scroll to complete
-    setTimeout(resolve, 800);
+    // Try to find the main scroll container (Twitter uses virtualized lists)
+    const scrollContainer = document.querySelector('[data-testid="primaryColumn"]')?.parentElement;
+
+    if (scrollContainer && scrollContainer.scrollHeight > scrollContainer.clientHeight) {
+      // Scroll the container
+      scrollContainer.scrollBy({
+        top: window.innerHeight * 0.8,
+        behavior: 'smooth',
+      });
+    } else {
+      // Fallback to window scroll
+      window.scrollBy({
+        top: window.innerHeight * 0.8,
+        behavior: 'smooth',
+      });
+    }
+
+    // Wait for scroll to complete and content to load
+    setTimeout(resolve, 1200);
   });
 }
 
@@ -247,43 +256,50 @@ export async function scrapeAllBookmarks(
   maxTweets: number = 10, // DEFAULT TO 10 FOR TESTING - change to 0 for unlimited
   processedIds: Set<string> = new Set(),
 ): Promise<ScrapedTweet[]> {
+  console.log(`[X-Bookmark] scrapeAllBookmarks called with maxTweets=${maxTweets}`);
+
   const tweets = new Map<string, ScrapedTweet>();
-  let previousCount = 0;
   let staleIterations = 0;
-  let skippedCount = 0;
-  const MAX_STALE_ITERATIONS = 3;
+  let totalSkippedCount = 0;
+  const MAX_STALE_ITERATIONS = 5; // More attempts before giving up
 
   const skipMsg = processedIds.size > 0 ? ` (skipping ${processedIds.size} already processed)` : '';
-  onProgress({ count: 0, status: `Starting scan...${skipMsg}` });
-  
+  onProgress({ count: 0, status: `Starting scan (limit: ${maxTweets})...${skipMsg}` });
+
   // Scroll to top first
   window.scrollTo({ top: 0, behavior: 'instant' });
   await new Promise(r => setTimeout(r, 500));
-  
+
   while (staleIterations < MAX_STALE_ITERATIONS) {
     // Check for abort
     if (signal?.aborted) {
       onProgress({ count: tweets.size, status: 'Scan cancelled' });
       break;
     }
-    
+
     // Check if we've reached the limit
     if (maxTweets > 0 && tweets.size >= maxTweets) {
-      onProgress({ count: tweets.size, status: `Reached test limit of ${maxTweets} bookmarks` });
+      onProgress({ count: tweets.size, status: `Reached limit of ${maxTweets} new bookmarks` });
       break;
     }
-    
+
+    // Track skipped count this iteration to know if we're still finding content
+    let skippedThisIteration = 0;
+    const previousTweetCount = tweets.size;
+
     // Extract visible tweets
     const visible = extractVisibleTweets();
+    console.log(`[X-Bookmark] Found ${visible.length} visible tweets, have ${tweets.size} collected`);
     for (const tweet of visible) {
-      // Skip already processed tweets
+      // Skip already processed tweets (don't count toward limit)
       if (processedIds.has(tweet.id)) {
-        skippedCount++;
+        skippedThisIteration++;
+        totalSkippedCount++;
         continue;
       }
       if (!tweets.has(tweet.id)) {
         tweets.set(tweet.id, tweet);
-        // Stop if we hit the limit
+        // Stop if we hit the limit of NEW tweets
         if (maxTweets > 0 && tweets.size >= maxTweets) {
           break;
         }
@@ -291,35 +307,41 @@ export async function scrapeAllBookmarks(
     }
 
     // Update progress
-    const skippedMsg = skippedCount > 0 ? ` (${skippedCount} skipped)` : '';
+    const skippedMsg = totalSkippedCount > 0 ? ` (${totalSkippedCount} already in knowledge graph)` : '';
     onProgress({
       count: tweets.size,
       status: `Found ${tweets.size} new bookmarks...${skippedMsg}`
     });
-    
+
     // Check if we've reached the limit after extraction
     if (maxTweets > 0 && tweets.size >= maxTweets) {
-      onProgress({ count: tweets.size, status: `Test limit reached: ${maxTweets} bookmarks` });
+      onProgress({ count: tweets.size, status: `Found ${maxTweets} new bookmarks!` });
       break;
     }
-    
-    // Check if we got new tweets
-    if (tweets.size === previousCount) {
+
+    // Check if we got new tweets OR skipped some (means there's content, keep scrolling)
+    const foundNewTweets = tweets.size > previousTweetCount;
+    const foundSkippedTweets = skippedThisIteration > 0;
+
+    if (!foundNewTweets && !foundSkippedTweets) {
+      // Truly no content found - might be at end or loading
       staleIterations++;
-      onProgress({ 
-        count: tweets.size, 
-        status: staleIterations < MAX_STALE_ITERATIONS 
-          ? 'Checking for more...' 
+      console.log(`[X-Bookmark] Stale iteration ${staleIterations}/${MAX_STALE_ITERATIONS} - no new content found`);
+      onProgress({
+        count: tweets.size,
+        status: staleIterations < MAX_STALE_ITERATIONS
+          ? 'Checking for more...'
           : 'Finishing up...'
       });
     } else {
+      // Found something (new or skipped), reset stale counter
+      console.log(`[X-Bookmark] Found ${foundNewTweets ? 'new tweets' : 'skipped tweets'}, resetting stale counter`);
       staleIterations = 0;
-      previousCount = tweets.size;
     }
-    
+
     // Scroll down
     await smoothScroll();
-    
+
     // Wait for new content
     const hasMore = await waitForLoad();
     if (!hasMore) {

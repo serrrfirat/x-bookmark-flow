@@ -3,11 +3,14 @@ import type { ProcessingMode } from '../../../../shared/src/types';
 interface IdleViewProps {
   onStartScan: () => void;
   onOpenHistory: () => void;
+  onClearData: () => void;
   mode: ProcessingMode;
   onModeChange: (mode: ProcessingMode) => void;
+  scrapeLimit: number;
+  onScrapeLimitChange: (limit: number) => void;
 }
 
-export function IdleView({ onStartScan, onOpenHistory, mode, onModeChange }: IdleViewProps) {
+export function IdleView({ onStartScan, onOpenHistory, onClearData, mode, onModeChange, scrapeLimit, onScrapeLimitChange }: IdleViewProps) {
   return (
     <div className="flex flex-col items-center justify-center h-full py-8 animate-in">
       {/* Illustration */}
@@ -70,11 +73,24 @@ export function IdleView({ onStartScan, onOpenHistory, mode, onModeChange }: Idl
       </div>
 
       {/* Mode description */}
-      <p className="text-xs text-x-text-secondary text-center max-w-[260px] mb-6">
+      <p className="text-xs text-x-text-secondary text-center max-w-[260px] mb-4">
         {mode === 'twitter'
           ? 'creates shareable twitter posts from your bookmarks'
           : 'creates a structured markdown doc about tools & resources'}
       </p>
+
+      {/* Scrape limit */}
+      <div className="flex items-center gap-3 mb-6">
+        <label className="text-sm text-x-text-secondary">bookmarks to scan:</label>
+        <input
+          type="number"
+          min="1"
+          max="100"
+          value={scrapeLimit}
+          onChange={(e) => onScrapeLimitChange(Math.max(1, Math.min(100, parseInt(e.target.value) || 10)))}
+          className="w-16 px-2 py-1 text-center text-sm bg-x-bg-secondary border border-x-border rounded-md text-x-text focus:outline-none focus:ring-1 focus:ring-x-accent"
+        />
+      </div>
 
       {/* CTA */}
       <button
@@ -92,21 +108,37 @@ export function IdleView({ onStartScan, onOpenHistory, mode, onModeChange }: Idl
         scan bookmarks
       </button>
 
-      {/* History button */}
-      <button
-        onClick={onOpenHistory}
-        className="btn-ghost text-sm mt-4 flex items-center gap-2"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
-        view history
-      </button>
+      {/* Secondary buttons */}
+      <div className="flex gap-4 mt-4">
+        <button
+          onClick={onOpenHistory}
+          className="btn-ghost text-sm flex items-center gap-2"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          history
+        </button>
+        <button
+          onClick={onClearData}
+          className="btn-ghost text-sm flex items-center gap-2 text-red-400 hover:text-red-300"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+            />
+          </svg>
+          reset data
+        </button>
+      </div>
 
       {/* Help text */}
       <p className="text-xs text-x-text-secondary mt-3">

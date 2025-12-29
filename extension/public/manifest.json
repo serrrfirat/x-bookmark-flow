@@ -12,7 +12,8 @@
   "permissions": [
     "activeTab",
     "storage",
-    "scripting"
+    "scripting",
+    "tabs"
   ],
   "host_permissions": [
     "https://x.com/*",
@@ -40,6 +41,12 @@
       ],
       "js": ["content.js"],
       "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["galaxy/index.html", "galaxy/index.js", "chunks/*", "popup/globals.css"],
+      "matches": ["<all_urls>"]
     }
   ]
 }

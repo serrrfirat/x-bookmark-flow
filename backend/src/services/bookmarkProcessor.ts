@@ -2,7 +2,7 @@ import { query } from '@anthropic-ai/claude-code';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { readFileSync } from 'fs';
-import type { ScrapedTweet, ClusterResult, TonePreset, ProcessingMode } from '../../../shared/src/types';
+import type { ScrapedTweet, ClusterResult, TonePreset, ProcessingMode, ClusterContext } from '../../../shared/src/types';
 import { saveSession } from './storage.js';
 import { emitAgentEvent } from './agentEvents.js';
 
@@ -48,9 +48,40 @@ function formatBookmarks(tweets: ScrapedTweet[]): string {
 }
 
 /**
+ * Format existing clusters for the prompt
+ */
+function formatExistingClusters(clusters: ClusterContext[]): string {
+  if (!clusters || clusters.length === 0) {
+    return '';
+  }
+
+  const clusterList = clusters.map((c, i) =>
+    `- "${c.id}": "${c.label}" (${c.tweetCount} bookmarks) - ${c.summary}`
+  ).join('\n');
+
+  return `
+## EXISTING CLUSTERS (your knowledge graph)
+
+you already have these topic clusters from previous sessions:
+
+${clusterList}
+
+IMPORTANT: when categorizing the new bookmarks below:
+1. FIRST check if each bookmark fits into one of the existing clusters above
+2. If it fits an existing cluster, use that cluster's EXACT id (e.g., "cluster-1")
+3. ONLY create a new cluster if the bookmark doesn't fit any existing topic
+4. New clusters should use ids like "cluster-${clusters.length + 1}", "cluster-${clusters.length + 2}", etc.
+
+This builds a persistent knowledge graph over time.
+`;
+}
+
+/**
  * Build prompt for Twitter mode (creates shareable posts)
  */
-function buildTwitterPrompt(bookmarksText: string): string {
+function buildTwitterPrompt(bookmarksText: string, existingClusters?: ClusterContext[]): string {
+  const existingClustersSection = formatExistingClusters(existingClusters || []);
+
   return `you are a content research writer. follow these skill instructions:
 
 <skill-instructions>
@@ -62,6 +93,7 @@ ${skillInstructions}
 analyze these bookmarks and create insightful content:
 
 ${bookmarksText}
+${existingClustersSection}
 
 ## specific requirements
 
@@ -129,7 +161,9 @@ IMPORTANT: your final response MUST contain the json block above. do not skip th
 /**
  * Build prompt for Research mode (creates structured markdown doc about tools)
  */
-function buildResearchPrompt(bookmarksText: string): string {
+function buildResearchPrompt(bookmarksText: string, existingClusters?: ClusterContext[]): string {
+  const existingClustersSection = formatExistingClusters(existingClusters || []);
+
   return `you are a technical research writer. your task is to analyze bookmarked tools and resources and create a well-structured, comprehensive markdown document.
 
 ## your task
@@ -137,6 +171,7 @@ function buildResearchPrompt(bookmarksText: string): string {
 analyze these bookmarks and create a structured research document:
 
 ${bookmarksText}
+${existingClustersSection}
 
 ## specific requirements
 
@@ -206,19 +241,21 @@ IMPORTANT: your final response MUST contain the json block above. do not skip th
 export async function processBookmarksWithAgent(
   tweets: ScrapedTweet[],
   tone: TonePreset = 'founder',
-  mode: ProcessingMode = 'twitter'
+  mode: ProcessingMode = 'twitter',
+  existingClusters?: ClusterContext[]
 ): Promise<ProcessBookmarksResult> {
   const startTime = Date.now();
 
-  console.log(`📚 Processing ${tweets.length} bookmarks (mode: ${mode})...`);
+  const isIncremental = !!(existingClusters && existingClusters.length > 0);
+  console.log(`📚 Processing ${tweets.length} bookmarks (mode: ${mode}, incremental: ${isIncremental}, clusters: ${existingClusters?.length || 0})...`);
 
   // Format bookmarks for the agent
   const bookmarksText = formatBookmarks(tweets);
 
-  // Build prompt based on mode
+  // Build prompt based on mode (with existing clusters context if available)
   const prompt = mode === 'research'
-    ? buildResearchPrompt(bookmarksText)
-    : buildTwitterPrompt(bookmarksText);
+    ? buildResearchPrompt(bookmarksText, existingClusters)
+    : buildTwitterPrompt(bookmarksText, existingClusters);
 
   try {
     const results: string[] = [];

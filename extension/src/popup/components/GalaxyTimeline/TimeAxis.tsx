@@ -1,43 +1,20 @@
 import { useMemo } from 'react';
-import { Text, Line } from '@react-three/drei';
+import { Line, Html } from '@react-three/drei';
 import { Vector3 } from 'three';
-import { formatTimeLabel } from './utils';
+import { CONTENT_TYPE_Z, ContentType } from './types';
 
-interface TimeAxisProps {
-  timeRange: {
-    min: number;
-    max: number;
-  };
-}
+const CONTENT_TYPE_LABELS: { type: ContentType; label: string; icon: string }[] = [
+  { type: 'tool', label: 'Tools & Repos', icon: '🔧' },
+  { type: 'article', label: 'Articles', icon: '📄' },
+  { type: 'thread', label: 'Threads', icon: '🧵' },
+  { type: 'tweet', label: 'Quick Tweets', icon: '💬' },
+];
 
-export function TimeAxis({ timeRange }: TimeAxisProps) {
-  const { min, max } = timeRange;
-
-  // Generate time labels
-  const timeLabels = useMemo(() => {
-    const labels: { time: number; position: number; label: string }[] = [];
-    const range = max - min;
-
-    // Create 5-7 evenly spaced labels
-    const numLabels = 6;
-    for (let i = 0; i < numLabels; i++) {
-      const t = i / (numLabels - 1);
-      const time = min + t * range;
-      const position = t * 20 - 10; // Map to -10 to 10 Z range
-      labels.push({
-        time,
-        position,
-        label: formatTimeLabel(time),
-      });
-    }
-
-    return labels;
-  }, [min, max]);
-
+export function ContentTypeAxis() {
   // Axis line points
   const axisPoints = useMemo(() => [
-    new Vector3(-15, -15, -10),
-    new Vector3(-15, -15, 10),
+    new Vector3(-18, -18, -10),
+    new Vector3(-18, -18, 12),
   ], []);
 
   return (
@@ -49,64 +26,52 @@ export function TimeAxis({ timeRange }: TimeAxisProps) {
         lineWidth={2}
       />
 
-      {/* Time labels and ticks */}
-      {timeLabels.map((item, index) => (
-        <group key={index} position={[-15, -15, item.position]}>
-          {/* Tick mark */}
-          <Line
-            points={[
-              new Vector3(0, 0, 0),
-              new Vector3(0.5, 0, 0),
-            ]}
-            color="#666666"
-            lineWidth={1}
-          />
+      {/* Content type labels */}
+      {CONTENT_TYPE_LABELS.map(({ type, label, icon }) => {
+        const z = CONTENT_TYPE_Z[type];
+        return (
+          <group key={type} position={[-18, -18, z]}>
+            {/* Tick mark */}
+            <Line
+              points={[
+                new Vector3(0, 0, 0),
+                new Vector3(0.8, 0, 0),
+              ]}
+              color="#666666"
+              lineWidth={1}
+            />
 
-          {/* Label */}
-          <Text
-            position={[-1.5, 0, 0]}
-            fontSize={0.5}
-            color="#888888"
-            anchorX="right"
-            anchorY="middle"
-          >
-            {item.label}
-          </Text>
+            {/* Horizontal grid plane (subtle) */}
+            <Line
+              points={[
+                new Vector3(0, 0, 0),
+                new Vector3(35, 35, 0),
+              ]}
+              color="#333333"
+              lineWidth={0.5}
+              transparent
+              opacity={0.2}
+            />
 
-          {/* Horizontal grid line (subtle) */}
-          <Line
-            points={[
-              new Vector3(0, 0, 0),
-              new Vector3(30, 30, 0),
-            ]}
-            color="#222222"
-            lineWidth={0.5}
-            transparent
-            opacity={0.3}
-          />
-        </group>
-      ))}
-
-      {/* Axis labels */}
-      <Text
-        position={[-15, -15, 12]}
-        fontSize={0.6}
-        color="#666666"
-        anchorX="center"
-        anchorY="middle"
-      >
-        Recent ↑
-      </Text>
-
-      <Text
-        position={[-15, -15, -12]}
-        fontSize={0.6}
-        color="#666666"
-        anchorX="center"
-        anchorY="middle"
-      >
-        ↓ Older
-      </Text>
+            {/* Label using HTML overlay */}
+            <Html
+              position={[-2, 0, 0]}
+              center
+              style={{ pointerEvents: 'none', userSelect: 'none' }}
+            >
+              <div className="flex items-center gap-1 whitespace-nowrap">
+                <span className="text-sm">{icon}</span>
+                <span className="text-xs text-gray-400" style={{ textShadow: '0 0 4px rgba(0,0,0,0.8)' }}>
+                  {label}
+                </span>
+              </div>
+            </Html>
+          </group>
+        );
+      })}
     </group>
   );
 }
+
+// Keep old export name for backwards compatibility
+export { ContentTypeAxis as TimeAxis };

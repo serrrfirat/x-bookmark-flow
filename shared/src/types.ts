@@ -63,12 +63,20 @@ export interface ProcessRequest {
   options?: ProcessOptions;
 }
 
+export interface ClusterContext {
+  id: string;
+  label: string;
+  summary: string;
+  tweetCount: number;
+}
+
 export interface ProcessOptions {
   minClusterSize?: number;
   maxClusters?: number;
   tonePreset?: TonePreset;
   includeMetrics?: boolean;
   mode?: ProcessingMode;
+  existingClusters?: ClusterContext[]; // For incremental processing
 }
 
 export interface ProcessResponse {

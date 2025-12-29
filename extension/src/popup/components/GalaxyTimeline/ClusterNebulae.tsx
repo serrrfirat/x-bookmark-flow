@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Text, Sphere } from '@react-three/drei';
+import { Sphere, Html } from '@react-three/drei';
 import { Mesh } from 'three';
 import type { ClusterCloud } from './types';
 
@@ -54,29 +54,24 @@ function ClusterNebula({ cluster, index }: { cluster: ClusterCloud; index: numbe
         />
       </Sphere>
 
-      {/* Cluster label */}
-      <Text
-        position={[0, size + 1, 0]}
-        fontSize={0.8}
-        color="#ffffff"
-        anchorX="center"
-        anchorY="middle"
-        outlineWidth={0.05}
-        outlineColor="#000000"
+      {/* Cluster label using HTML overlay */}
+      <Html
+        position={[0, size + 1.5, 0]}
+        center
+        style={{
+          pointerEvents: 'none',
+          userSelect: 'none',
+        }}
       >
-        {cluster.label}
-      </Text>
-
-      {/* Node count badge */}
-      <Text
-        position={[0, size + 0.2, 0]}
-        fontSize={0.4}
-        color="#888888"
-        anchorX="center"
-        anchorY="middle"
-      >
-        {cluster.nodeCount} bookmarks
-      </Text>
+        <div className="text-center whitespace-nowrap">
+          <div className="text-white text-sm font-semibold drop-shadow-lg" style={{ textShadow: '0 0 8px rgba(0,0,0,0.8)' }}>
+            {cluster.label}
+          </div>
+          <div className="text-gray-400 text-xs">
+            {cluster.nodeCount} bookmarks
+          </div>
+        </div>
+      </Html>
     </group>
   );
 }

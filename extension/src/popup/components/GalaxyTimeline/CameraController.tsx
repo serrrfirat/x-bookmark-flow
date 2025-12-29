@@ -14,11 +14,11 @@ export function CameraController({ target, onArrived }: CameraControllerProps) {
 
   useEffect(() => {
     if (target) {
-      // Set new target position (camera offset from node)
+      // Set new target position (camera above node for 2D top-down view)
       targetRef.current = new Vector3(
-        target[0] + 8,
-        target[1] - 8,
-        target[2] + 5
+        target[0],
+        target[1],
+        25 // Fixed height above the map
       );
       arrivedRef.current = false;
     } else {

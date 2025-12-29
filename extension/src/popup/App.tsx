@@ -9,7 +9,7 @@ import { ErrorView } from './components/ErrorView';
 import { HistoryView } from './components/HistoryView';
 
 export default function App() {
-  const { status, mode, setScanning, setTweets, setReview, setError, setIdle, setMode } = useStore();
+  const { status, mode, scrapeLimit, setScanning, setTweets, setReview, setError, setIdle, setMode, setScrapeLimit } = useStore();
   const [showHistory, setShowHistory] = useState(false);
   const [loadingSession, setLoadingSession] = useState(false);
 
@@ -72,7 +72,14 @@ export default function App() {
     setShowHistory(false);
     setScanning(0, 'Starting scan...');
 
-    const response = await chrome.runtime.sendMessage({ type: 'POPUP_START_SCAN' });
+    // Get current state to avoid stale closure
+    const currentLimit = useStore.getState().scrapeLimit;
+    console.log('[Popup] Starting scan with limit:', currentLimit);
+
+    const response = await chrome.runtime.sendMessage({
+      type: 'POPUP_START_SCAN',
+      scrapeLimit: currentLimit,
+    });
 
     if (!response.success) {
       setError(response.error || 'Failed to start scan');
@@ -130,6 +137,18 @@ export default function App() {
     });
   };
 
+  const clearData = async () => {
+    if (!confirm('Clear all saved data? This will reset your knowledge graph and processed bookmarks.')) {
+      return;
+    }
+
+    const response = await chrome.runtime.sendMessage({ type: 'POPUP_CLEAR_DATA' });
+    if (response.success) {
+      setIdle();
+      setShowHistory(false);
+    }
+  };
+
   const openHistory = () => {
     setShowHistory(true);
   };
@@ -162,8 +181,11 @@ export default function App() {
               <IdleView
                 onStartScan={startScan}
                 onOpenHistory={openHistory}
+                onClearData={clearData}
                 mode={mode}
                 onModeChange={setMode}
+                scrapeLimit={scrapeLimit}
+                onScrapeLimitChange={setScrapeLimit}
               />
             )}
             {status === 'scanning' && <ScanningView onStop={stopScan} />}

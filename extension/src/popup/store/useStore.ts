@@ -33,6 +33,7 @@ interface Store {
   error: AppError | undefined;
   tweets: ScrapedTweet[];
   mode: ProcessingMode;
+  scrapeLimit: number;
 
   // Actions
   setIdle: () => void;
@@ -41,6 +42,7 @@ interface Store {
   setReview: (data: AppData) => void;
   setError: (message: string, code?: string) => void;
   setMode: (mode: ProcessingMode) => void;
+  setScrapeLimit: (limit: number) => void;
 
   // Data updates
   updateCluster: (clusterId: string, updates: Partial<ClusterResult>) => void;
@@ -58,6 +60,7 @@ export const useStore = create<Store>((set) => ({
   error: undefined,
   tweets: [],
   mode: 'twitter', // Default to twitter mode
+  scrapeLimit: 10, // Default scrape limit
 
   // State transitions
   setIdle: () => set({
@@ -67,6 +70,8 @@ export const useStore = create<Store>((set) => ({
   }),
 
   setMode: (mode: ProcessingMode) => set({ mode }),
+
+  setScrapeLimit: (limit: number) => set({ scrapeLimit: limit }),
 
   setScanning: (count: number, _status: string) => set({
     status: 'scanning',

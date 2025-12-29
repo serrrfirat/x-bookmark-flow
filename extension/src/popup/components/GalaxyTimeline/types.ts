@@ -1,5 +1,8 @@
 import type { ScrapedTweet, ClusterResult } from '../../../../../shared/src/types';
 
+// Content type determines Z-axis position
+export type ContentType = 'tool' | 'article' | 'thread' | 'tweet';
+
 export interface BookmarkNode {
   id: string;
   tweet: ScrapedTweet;
@@ -9,6 +12,8 @@ export interface BookmarkNode {
   color: string;
   size: number;
   timestamp: number;
+  contentType: ContentType;
+  authorId: string; // For author-based connections
 }
 
 export interface ClusterCloud {
@@ -31,11 +36,15 @@ export interface GalaxyData {
   nodes: BookmarkNode[];
   clusters: ClusterCloud[];
   edges: ConnectionEdge[];
-  timeRange: {
-    min: number;
-    max: number;
-  };
 }
+
+// Z-axis positions for content types (tools float highest)
+export const CONTENT_TYPE_Z: Record<ContentType, number> = {
+  tool: 8,      // GitHub repos, tools to try - top
+  article: 3,   // Articles, deep reads - upper middle
+  thread: -2,   // Threads, knowledge dumps - lower middle
+  tweet: -7,    // Quick tweets - bottom
+};
 
 // Cluster color palette
 export const CLUSTER_COLORS = [

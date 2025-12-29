@@ -35,6 +35,12 @@ const processRequestSchema = z.object({
     tonePreset: z.enum(['neutral', 'founder', 'contrarian']).optional(),
     includeMetrics: z.boolean().optional(),
     mode: z.enum(['twitter', 'research']).optional(),
+    existingClusters: z.array(z.object({
+      id: z.string(),
+      label: z.string(),
+      summary: z.string(),
+      tweetCount: z.number(),
+    })).optional(),
   }).optional(),
 });
 
@@ -68,13 +74,17 @@ processRouter.post('/process-bookmarks', async (req, res) => {
     }
 
     const mode = options?.mode || 'twitter';
-    console.log(`📥 Processing ${tweets.length} bookmarks with Claude Code Agent (mode: ${mode})...`);
+    const existingClusters = options?.existingClusters;
+    const isIncremental = !!(existingClusters && existingClusters.length > 0);
+
+    console.log(`📥 Processing ${tweets.length} bookmarks with Claude Code Agent (mode: ${mode}, incremental: ${isIncremental}, existing clusters: ${existingClusters?.length || 0})...`);
 
     // Process all bookmarks with Claude Agent
     const result = await processBookmarksWithAgent(
       tweets,
       options?.tonePreset || 'founder',
-      mode
+      mode,
+      existingClusters
     );
 
     console.log(`✅ Processing complete in ${result.meta.processingTimeMs}ms`);

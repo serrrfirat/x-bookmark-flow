@@ -1,12 +1,10 @@
-import { Suspense, useState, useCallback, useMemo } from 'react';
+import { Suspense, useState, useCallback, useMemo, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Stars, PerspectiveCamera } from '@react-three/drei';
-import { EffectComposer, Bloom } from '@react-three/postprocessing';
+import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
 
 import { BookmarkNodes } from './BookmarkNodes';
 import { ClusterNebulae } from './ClusterNebulae';
 import { ConnectionLines } from './ConnectionLines';
-import { TimeAxis } from './TimeAxis';
 import { CameraController } from './CameraController';
 import { transformToGalaxyData } from './utils';
 import type { ClusterResult } from '../../../../../shared/src/types';
@@ -30,6 +28,20 @@ interface SceneProps {
 
 function Scene({ data, searchQuery, focusedNodeId, onNodeSelect, onSearchResults }: SceneProps) {
   const [hoveredNode, setHoveredNode] = useState<BookmarkNode | null>(null);
+  const [rotationPaused, setRotationPaused] = useState(false);
+
+  // Toggle rotation with space key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && e.target === document.body) {
+        e.preventDefault();
+        setRotationPaused(prev => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Search filtering
   const { highlightedIds, searchResults } = useMemo(() => {
@@ -78,8 +90,8 @@ function Scene({ data, searchQuery, focusedNodeId, onNodeSelect, onSearchResults
 
   return (
     <>
-      {/* Camera */}
-      <PerspectiveCamera makeDefault position={[0, -30, 15]} fov={60} />
+      {/* Camera - top-down view for 2D map */}
+      <PerspectiveCamera makeDefault position={[0, 0, 40]} fov={60} />
 
       {/* Camera fly-to controller */}
       <CameraController target={focusedNodePosition} />
@@ -91,7 +103,7 @@ function Scene({ data, searchQuery, focusedNodeId, onNodeSelect, onSearchResults
         enableRotate={true}
         minDistance={10}
         maxDistance={100}
-        autoRotate={!hoveredNode && !isSearching}
+        autoRotate={!hoveredNode && !isSearching && !rotationPaused}
         autoRotateSpeed={0.3}
       />
 
@@ -100,11 +112,7 @@ function Scene({ data, searchQuery, focusedNodeId, onNodeSelect, onSearchResults
       <pointLight position={[10, 10, 10]} intensity={1} />
       <pointLight position={[-10, -10, -10]} intensity={0.5} color="#6366f1" />
 
-      {/* Background stars */}
-      <Stars radius={100} depth={50} count={3000} factor={4} fade speed={0.5} />
-
-      {/* Time axis */}
-      <TimeAxis timeRange={data.timeRange} />
+      {/* Background - simple dark space */}
 
       {/* Cluster nebulae (background clouds) */}
       <ClusterNebulae clusters={data.clusters} />
@@ -122,14 +130,6 @@ function Scene({ data, searchQuery, focusedNodeId, onNodeSelect, onSearchResults
         onNodeHover={setHoveredNode}
       />
 
-      {/* Post-processing effects */}
-      <EffectComposer>
-        <Bloom
-          luminanceThreshold={0.2}
-          luminanceSmoothing={0.9}
-          intensity={0.8}
-        />
-      </EffectComposer>
     </>
   );
 }

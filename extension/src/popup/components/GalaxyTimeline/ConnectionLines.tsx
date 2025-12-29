@@ -24,17 +24,17 @@ function ConnectionLine({
 }) {
   const lineRef = useRef<any>(null);
 
-  // Different colors for different connection types
-  const color = useMemo(() => {
+  // Different colors and widths for different connection types
+  const { color, lineWidth } = useMemo(() => {
     switch (type) {
       case 'author':
-        return '#60A5FA'; // blue for same author
+        return { color: '#60A5FA', lineWidth: 2 }; // blue, thicker for same author
       case 'link':
-        return '#FBBF24'; // amber for shared links
+        return { color: '#FBBF24', lineWidth: 1.5 }; // amber for shared links
       case 'cluster':
-        return '#34D399'; // emerald for same cluster
+        return { color: '#34D399', lineWidth: 1 }; // emerald for same cluster
       default:
-        return '#888888';
+        return { color: '#888888', lineWidth: 1 };
     }
   }, [type]);
 
@@ -84,9 +84,9 @@ function ConnectionLine({
       ref={lineRef}
       points={points}
       color={color}
-      lineWidth={1}
+      lineWidth={lineWidth}
       transparent
-      opacity={0.4 * strength}
+      opacity={0.5 * strength}
     />
   );
 }

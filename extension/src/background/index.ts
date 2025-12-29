@@ -14,7 +14,15 @@ import type {
   ProcessingStep,
   AppStatus
 } from '../../../shared/src/types';
-import { getProcessedTweetIds, addProcessedTweetIds } from './storage';
+import {
+  getProcessedTweetIds,
+  addProcessedTweetIds,
+  clearProcessedTweetIds,
+  loadKnowledgeGraph,
+  updateKnowledgeGraph,
+  clearKnowledgeGraph,
+  getClusterContext,
+} from './storage';
 
 // Configuration
 const API_BASE_URL = 'http://localhost:9999/api';
@@ -147,7 +155,8 @@ chrome.runtime.onMessage.addListener(
     
     // Handle popup messages
     if (message.type === 'POPUP_START_SCAN') {
-      handleStartScan().then(sendResponse);
+      const msg = message as { type: string; scrapeLimit?: number };
+      handleStartScan(msg.scrapeLimit).then(sendResponse);
       return true;
     }
     
@@ -179,12 +188,18 @@ chrome.runtime.onMessage.addListener(
       sendResponse({ success: true });
       return true;
     }
-    
+
+    // Clear all stored data (knowledge graph + processed IDs)
+    if (message.type === 'POPUP_CLEAR_DATA') {
+      handleClearData().then(sendResponse);
+      return true;
+    }
+
     return false;
   },
 );
 
-async function handleStartScan(): Promise<{ success: boolean; error?: string }> {
+async function handleStartScan(scrapeLimit: number = 10): Promise<{ success: boolean; error?: string }> {
   try {
     const tab = await getActiveTab();
 
@@ -197,7 +212,11 @@ async function handleStartScan(): Promise<{ success: boolean; error?: string }> 
 
     // Load processed tweet IDs to skip
     const processedIds = await getProcessedTweetIds();
-    console.log(`[Background] Loaded ${processedIds.size} processed tweet IDs`);
+    console.log(`[Background] Loaded ${processedIds.size} processed tweet IDs:`, Array.from(processedIds).slice(0, 5));
+
+    // Also load knowledge graph to check
+    const existingGraph = await loadKnowledgeGraph();
+    console.log(`[Background] Existing knowledge graph: ${existingGraph?.clusters?.length || 0} clusters, ${existingGraph?.totalBookmarks || 0} bookmarks`);
 
     // Reset state
     appState = {
@@ -208,10 +227,13 @@ async function handleStartScan(): Promise<{ success: boolean; error?: string }> 
       error: null,
     };
 
+    console.log(`[Background] Starting scan with limit: ${scrapeLimit}`);
+
     // Start scanning with processed IDs to skip
     await sendToContentScript({
       type: 'START_SCRAPE',
       processedIds: Array.from(processedIds),
+      scrapeLimit,
     });
 
     return { success: true };
@@ -249,24 +271,83 @@ async function handleProcess(
   appState.status = 'processing';
   appState.progress = { ...appState.progress, step: 'embedding' };
 
-  const result = await processBookmarks(appState.tweets, options);
+  // Load existing knowledge graph for incremental processing
+  const existingGraph = await loadKnowledgeGraph();
+  const existingClusters = existingGraph?.clusters || [];
 
-  // Store results in state
+  console.log(`[Background] Found ${existingClusters.length} existing clusters in knowledge graph`);
+
+  // Pass existing clusters context to API for incremental processing
+  const processOptions: ProcessOptions = {
+    ...options,
+    existingClusters: existingClusters.length > 0
+      ? getClusterContext(existingClusters)
+      : undefined,
+  };
+
+  const result = await processBookmarks(appState.tweets, processOptions);
+  console.log(`[Background] API response:`, result.success ? 'success' : 'failed', result);
+
+  // Store results in state and update knowledge graph
   if (result.success && 'data' in result) {
+    console.log(`[Background] API returned ${result.data.clusters?.length || 0} clusters`);
+
+    // Update the knowledge graph with merged results
+    const updatedGraph = await updateKnowledgeGraph(result.data.clusters);
+
+    console.log(`[Background] Updated knowledge graph: ${updatedGraph.clusters.length} clusters, ${updatedGraph.totalBookmarks} total bookmarks`);
+
+    // Verify it was saved
+    const verifyGraph = await loadKnowledgeGraph();
+    console.log(`[Background] Verified knowledge graph saved: ${verifyGraph?.clusters?.length || 0} clusters`);
+
+    // Use the full merged clusters for display
     appState.status = 'review';
-    appState.data = result.data;
+    appState.data = {
+      clusters: updatedGraph.clusters,
+      meta: {
+        ...result.data.meta,
+        clustersGenerated: updatedGraph.clusters.length,
+      },
+    };
     appState.error = null;
 
     // Save processed tweet IDs so we skip them next time
-    const processedIds = appState.tweets.map(t => t.id);
-    await addProcessedTweetIds(processedIds);
-    console.log(`[Background] Saved ${processedIds.length} processed tweet IDs`);
+    const newProcessedIds = appState.tweets.map(t => t.id);
+    await addProcessedTweetIds(newProcessedIds);
+    console.log(`[Background] Saved ${newProcessedIds.length} processed tweet IDs:`, newProcessedIds.slice(0, 3));
+
+    // Verify storage was saved
+    const verifyIds = await getProcessedTweetIds();
+    console.log(`[Background] Verified storage has ${verifyIds.size} tweet IDs`);
   } else if (!result.success && 'error' in result) {
     appState.status = 'error';
     appState.error = result.error;
   }
 
   return result;
+}
+
+async function handleClearData(): Promise<{ success: boolean }> {
+  try {
+    await clearProcessedTweetIds();
+    await clearKnowledgeGraph();
+
+    // Reset app state too
+    appState = {
+      status: 'idle',
+      tweets: [],
+      progress: { count: 0, status: 'idle' },
+      data: null,
+      error: null,
+    };
+
+    console.log('[Background] Cleared all stored data');
+    return { success: true };
+  } catch (error) {
+    console.error('[Background] Error clearing data:', error);
+    return { success: false };
+  }
 }
 
 // Log when service worker starts

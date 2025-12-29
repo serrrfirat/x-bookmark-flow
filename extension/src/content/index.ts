@@ -19,8 +19,9 @@ function sendMessage(message: ContentMessage): void {
 /**
  * Start scraping bookmarks
  * @param processedIds - Array of tweet IDs to skip (already processed)
+ * @param scrapeLimit - Maximum number of new bookmarks to scrape
  */
-async function startScraping(processedIds: string[] = []): Promise<void> {
+async function startScraping(processedIds: string[] = [], scrapeLimit: number = 10): Promise<void> {
   if (isScanning) {
     console.log('[X-Bookmark] Already scanning');
     return;
@@ -30,7 +31,7 @@ async function startScraping(processedIds: string[] = []): Promise<void> {
   abortController = new AbortController();
 
   const processedSet = new Set(processedIds);
-  console.log(`[X-Bookmark] Starting bookmark scan (skipping ${processedSet.size} already processed)`);
+  console.log(`[X-Bookmark] Starting bookmark scan (limit: ${scrapeLimit}, skipping ${processedSet.size} already processed)`, processedIds.slice(0, 3));
 
   try {
     const tweets = await scrapeAllBookmarks(
@@ -42,7 +43,7 @@ async function startScraping(processedIds: string[] = []): Promise<void> {
         });
       },
       abortController.signal,
-      10, // maxTweets
+      scrapeLimit,
       processedSet,
     );
 
@@ -78,12 +79,12 @@ function stopScraping(): void {
  * Handle messages from background script
  */
 chrome.runtime.onMessage.addListener(
-  (message: BackgroundMessage & { processedIds?: string[] }, _sender, sendResponse) => {
+  (message: BackgroundMessage & { processedIds?: string[]; scrapeLimit?: number }, _sender, sendResponse) => {
     console.log('[X-Bookmark] Received message:', message.type);
 
     switch (message.type) {
       case 'START_SCRAPE':
-        startScraping(message.processedIds || []);
+        startScraping(message.processedIds || [], message.scrapeLimit || 10);
         sendResponse({ success: true });
         break;
 
