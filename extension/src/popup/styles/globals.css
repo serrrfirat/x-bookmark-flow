@@ -1,0 +1,95 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom base styles */
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html {
+    font-size: 14px;
+  }
+
+  body {
+    @apply bg-x-bg text-x-text font-sans antialiased;
+    width: 400px;
+    min-height: 500px;
+    max-height: 600px;
+    overflow-y: auto;
+  }
+
+  /* Custom scrollbar for dark theme */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-x-bg-secondary;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-x-border rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-x-text-secondary;
+  }
+}
+
+/* Component utilities */
+@layer components {
+  .btn {
+    @apply px-4 py-2 rounded-full font-semibold transition-all duration-200;
+    @apply focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-x-bg;
+  }
+
+  .btn-primary {
+    @apply btn bg-x-accent text-white hover:bg-x-accent-hover;
+    @apply focus:ring-x-accent;
+  }
+
+  .btn-secondary {
+    @apply btn bg-transparent text-x-text border border-x-border;
+    @apply hover:bg-x-bg-hover hover:border-x-text-secondary;
+    @apply focus:ring-x-border;
+  }
+
+  .btn-ghost {
+    @apply btn bg-transparent text-x-text-secondary;
+    @apply hover:bg-x-bg-secondary hover:text-x-text;
+  }
+
+  .card {
+    @apply bg-x-bg-secondary rounded-xl p-4 border border-x-border;
+  }
+
+  .input {
+    @apply w-full bg-x-bg-tertiary text-x-text rounded-lg px-4 py-2;
+    @apply border border-x-border focus:border-x-accent;
+    @apply focus:outline-none focus:ring-1 focus:ring-x-accent;
+    @apply placeholder:text-x-text-secondary;
+  }
+
+  .textarea {
+    @apply input resize-none;
+    @apply min-h-[80px];
+  }
+}
+
+/* Animation utilities */
+@layer utilities {
+  .animate-in {
+    animation: slideUp 0.3s ease-out, fadeIn 0.3s ease-out;
+  }
+
+  .stagger-1 { animation-delay: 0.05s; }
+  .stagger-2 { animation-delay: 0.1s; }
+  .stagger-3 { animation-delay: 0.15s; }
+  .stagger-4 { animation-delay: 0.2s; }
+  .stagger-5 { animation-delay: 0.25s; }
+}
+
