@@ -1,6 +1,8 @@
 # X Bookmark Flow
 
-<img width="395" height="519" alt="image" src="https://github.com/user-attachments/assets/61ba6cc5-7685-4a4a-988c-b0f741f30618" />
+<p align="center">
+  <img width="395" height="519" alt="image" src="https://github.com/user-attachments/assets/61ba6cc5-7685-4a4a-988c-b0f741f30618" />
+</p>
 
 
 Transform your X (Twitter) bookmarks into structured content using AI. Scan your bookmarks, group them by topic, and generate shareable Twitter posts or comprehensive research documents.
