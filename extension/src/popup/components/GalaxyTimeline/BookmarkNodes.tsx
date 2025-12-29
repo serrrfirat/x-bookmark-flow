@@ -6,14 +6,26 @@ import type { BookmarkNode } from './types';
 
 interface BookmarkNodesProps {
   nodes: BookmarkNode[];
+  highlightedIds?: Set<string>;
+  focusedId?: string | null;
+  dimNonMatches?: boolean;
   onNodeClick?: (node: BookmarkNode) => void;
   onNodeHover?: (node: BookmarkNode | null) => void;
 }
 
 const tempObject = new Object3D();
 const tempColor = new Color();
+const HIGHLIGHT_COLOR = new Color('#FFD700'); // Gold for search matches
+const DIM_OPACITY = 0.15;
 
-export function BookmarkNodes({ nodes, onNodeClick, onNodeHover }: BookmarkNodesProps) {
+export function BookmarkNodes({
+  nodes,
+  highlightedIds,
+  focusedId,
+  dimNonMatches = false,
+  onNodeClick,
+  onNodeHover
+}: BookmarkNodesProps) {
   const meshRef = useRef<InstancedMesh>(null);
   const [hoveredNode, setHoveredNode] = useState<BookmarkNode | null>(null);
 
@@ -31,8 +43,13 @@ export function BookmarkNodes({ nodes, onNodeClick, onNodeHover }: BookmarkNodes
     if (!meshRef.current) return;
 
     const time = state.clock.getElapsedTime();
+    const hasHighlights = highlightedIds && highlightedIds.size > 0;
 
     nodes.forEach((node, index) => {
+      const isHighlighted = highlightedIds?.has(node.id);
+      const isFocused = focusedId === node.id;
+      const isHovered = hoveredNode?.id === node.id;
+
       // Base position with subtle floating animation
       const floatOffset = Math.sin(time * 0.5 + index * 0.1) * 0.1;
 
@@ -42,21 +59,47 @@ export function BookmarkNodes({ nodes, onNodeClick, onNodeHover }: BookmarkNodes
         node.position[2] + floatOffset
       );
 
-      // Pulse effect for hovered node
+      // Scale: pulse effect for hovered/focused/highlighted nodes
       let scale = node.size;
-      if (hoveredNode?.id === node.id) {
+      if (isFocused) {
+        // Focused node (current search selection) - largest pulse
+        scale *= 2.5 + Math.sin(time * 6) * 0.3;
+      } else if (isHighlighted) {
+        // Highlighted search result - medium pulse
+        scale *= 1.8 + Math.sin(time * 4) * 0.2;
+      } else if (isHovered) {
+        // Hovered node
         scale *= 1.5 + Math.sin(time * 4) * 0.2;
+      } else if (hasHighlights && dimNonMatches) {
+        // Dim non-matching nodes when searching
+        scale *= 0.6;
       }
 
       tempObject.scale.setScalar(scale);
       tempObject.updateMatrix();
       meshRef.current!.setMatrixAt(index, tempObject.matrix);
 
-      // Set color
-      tempColor.set(node.color);
-      if (hoveredNode?.id === node.id) {
-        tempColor.multiplyScalar(1.5); // Brighten on hover
+      // Set color based on state
+      if (isFocused) {
+        // Focused: bright gold
+        tempColor.copy(HIGHLIGHT_COLOR);
+        tempColor.multiplyScalar(2);
+      } else if (isHighlighted) {
+        // Highlighted: gold tint
+        tempColor.copy(HIGHLIGHT_COLOR);
+      } else if (isHovered) {
+        // Hovered: brighter original color
+        tempColor.set(node.color);
+        tempColor.multiplyScalar(1.5);
+      } else if (hasHighlights && dimNonMatches) {
+        // Dim non-matches
+        tempColor.set(node.color);
+        tempColor.multiplyScalar(DIM_OPACITY);
+      } else {
+        // Default color
+        tempColor.set(node.color);
       }
+
       meshRef.current!.setColorAt(index, tempColor);
     });
 

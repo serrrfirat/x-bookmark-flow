@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { GalaxyScene } from './GalaxyScene';
 import type { ClusterResult } from '../../../../../shared/src/types';
 import type { BookmarkNode } from './types';
@@ -10,9 +10,17 @@ interface GalaxyTimelineProps {
 
 export function GalaxyTimeline({ clusters, onClose }: GalaxyTimelineProps) {
   const [selectedNode, setSelectedNode] = useState<BookmarkNode | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<BookmarkNode[]>([]);
+  const [focusedResultIndex, setFocusedResultIndex] = useState(0);
+  const [showResults, setShowResults] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const focusedNodeId = searchResults.length > 0 ? searchResults[focusedResultIndex]?.id : null;
 
   const handleNodeSelect = (node: BookmarkNode) => {
     setSelectedNode(node);
+    setShowResults(false);
   };
 
   const handleOpenTweet = () => {
@@ -20,6 +28,67 @@ export function GalaxyTimeline({ clusters, onClose }: GalaxyTimelineProps) {
       window.open(selectedNode.tweet.url, '_blank');
     }
   };
+
+  const handleSearchResults = useCallback((results: BookmarkNode[]) => {
+    setSearchResults(results);
+    setFocusedResultIndex(0);
+    setShowResults(results.length > 0);
+  }, []);
+
+  const handleResultClick = (node: BookmarkNode, index: number) => {
+    setFocusedResultIndex(index);
+    setSelectedNode(node);
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
+    setSearchResults([]);
+    setShowResults(false);
+    setFocusedResultIndex(0);
+  };
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd/Ctrl + F to focus search
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        return;
+      }
+
+      // Only handle navigation when search is active
+      if (!showResults || searchResults.length === 0) return;
+
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault();
+          setFocusedResultIndex(i => Math.min(i + 1, searchResults.length - 1));
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          setFocusedResultIndex(i => Math.max(i - 1, 0));
+          break;
+        case 'Enter':
+          e.preventDefault();
+          if (searchResults[focusedResultIndex]) {
+            setSelectedNode(searchResults[focusedResultIndex]);
+          }
+          break;
+        case 'Escape':
+          e.preventDefault();
+          if (searchQuery) {
+            clearSearch();
+          } else {
+            searchInputRef.current?.blur();
+          }
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showResults, searchResults, focusedResultIndex, searchQuery]);
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col">
@@ -35,19 +104,38 @@ export function GalaxyTimeline({ clusters, onClose }: GalaxyTimelineProps) {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Legend */}
-          <div className="hidden sm:flex items-center gap-3 mr-4 text-xs text-gray-400">
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-blue-400" />
-              Same author
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-amber-400" />
-              Shared link
-            </span>
+        <div className="flex items-center gap-3">
+          {/* Search Input */}
+          <div className="relative">
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search bookmarks... (⌘F)"
+              className="w-64 px-3 py-1.5 pl-9 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            />
+            <svg
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            {searchQuery && (
+              <button
+                onClick={clearSearch}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-white"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
           </div>
 
+          {/* Close button */}
           <button
             onClick={onClose}
             className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
@@ -62,7 +150,53 @@ export function GalaxyTimeline({ clusters, onClose }: GalaxyTimelineProps) {
 
       {/* 3D Canvas */}
       <div className="flex-1 relative">
-        <GalaxyScene clusters={clusters} onNodeSelect={handleNodeSelect} />
+        <GalaxyScene
+          clusters={clusters}
+          searchQuery={searchQuery}
+          focusedNodeId={focusedNodeId}
+          onNodeSelect={handleNodeSelect}
+          onSearchResults={handleSearchResults}
+        />
+
+        {/* Search Results Panel */}
+        {showResults && searchResults.length > 0 && (
+          <div className="absolute top-4 left-4 w-80 max-h-[60vh] bg-gray-900/95 backdrop-blur rounded-xl border border-gray-700 shadow-2xl overflow-hidden flex flex-col">
+            <div className="px-4 py-2 border-b border-gray-800 flex items-center justify-between">
+              <span className="text-sm text-gray-300">
+                {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}
+              </span>
+              <span className="text-xs text-gray-500">
+                ↑↓ navigate · Enter select
+              </span>
+            </div>
+            <div className="overflow-y-auto flex-1">
+              {searchResults.map((node, index) => (
+                <button
+                  key={node.id}
+                  onClick={() => handleResultClick(node, index)}
+                  className={`w-full px-4 py-3 text-left border-b border-gray-800/50 transition-colors ${
+                    index === focusedResultIndex
+                      ? 'bg-indigo-500/20 border-l-2 border-l-indigo-500'
+                      : 'hover:bg-gray-800/50'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <span
+                      className="w-2 h-2 rounded-full"
+                      style={{ backgroundColor: node.color }}
+                    />
+                    <span className="text-xs text-gray-400">@{node.tweet.authorHandle}</span>
+                    <span className="text-xs text-gray-600">·</span>
+                    <span className="text-xs text-gray-500">{node.clusterLabel}</span>
+                  </div>
+                  <p className="text-sm text-gray-200 line-clamp-2">
+                    {node.tweet.text}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Controls hint */}
         <div className="absolute bottom-4 left-4 text-xs text-gray-500 bg-gray-900/60 px-3 py-2 rounded-lg backdrop-blur">
